@@ -537,7 +537,7 @@ def cumulants(field, threads=None, chunk_voxels=1 << 17):
     skewness = np.array([f3 / s0**4.,
                          1.5 * fg2 / (s0**2. * s1**2.),
                          -1.5 * d / (d-1.) * g2lap / s1**4. if d > 1 else 0.])
-    # Connected fourth-order moments: the Gaussian contributions are subtracted (Eqs. 79-84; note that Eq. 79 should read 3σ⁴)
+    # Connected fourth-order moments
     f4_c = f4 - 3. * s0**4.
     f2g2_c = f2g2 - s0**2. * s1**2.
     fg2lap_c = fg2lap + s1**4.
