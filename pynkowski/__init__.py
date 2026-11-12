@@ -11,14 +11,14 @@ The formats currently supported for **input data** are the following:
 
 - Scalar HEALPix maps, as the ones used by [healpy](https://healpy.readthedocs.io/), such as $T, \kappa, P^2$ (see [paper 1](https://arxiv.org/abs/2211.07562)).
 - Polarisation HEALPix maps in the $SO(3)$ formalism (see [paper 2](https://arxiv.org/abs/2301.13191)).
-- 2D and 3D numpy arrays (coming soon).
+- 2D and 3D numpy arrays.
 
 The theoretical expectation of some statistics is currently supported for the following **theoretical fields**:
 
 - Gaussian fields (such as CMB $T$ or the initial density field, see [paper 1](https://arxiv.org/abs/2211.07562)).
 - $\chi^2$ fields (such as CMB $P^2$, see [paper 1](https://arxiv.org/abs/2211.07562)).
 - Spin 2 maps in the $SO(3)$ formalism (see [paper 2](https://arxiv.org/abs/2301.13191)).
-- Weakly non-Gaussian fields, with a perturbative expansion around the Gaussian case up to second order (such as the matter density field in the weakly non-linear regime, see [Matsubara & Kuriki 2021](https://arxiv.org/abs/2011.04954)).
+- Weakly non-Gaussian fields, with a perturbative expansion around the Gaussian case up to second order (see [Matsubara & Kuriki 2021](https://arxiv.org/abs/2011.04954)).
 
 We are actively working on the implementation of more statistics, data formats, and theoretical fields. If you want to contribute, we welcome and appreciate pull requests. 
 If you have any comments or suggestions, please feel free to contact us by email ([1](mailto:javier.carron@csic.es) and [2](mailto:alessandro.carones@roma2.infn.it )) or by opening a discussion thread or issue.
