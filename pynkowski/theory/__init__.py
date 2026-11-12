@@ -4,6 +4,7 @@
 - [`gaussian`](theory/gaussian.html): Isotropic Gaussian fields such as CMB temperature or initial density field.
 - [`spingaussian`](theory/spingaussian.html): Isotropic Gaussian fields in the SO(3) formalism, such as the CMB polarization.
 - [`chi2`](theory/chi2.html): Isotropic $\chi^2$ fields, such as the modulus of the CMB polarization.
+- [`nongaussian`](theory/nongaussian.html): Isotropic weakly non-Gaussian fields, with a perturbative expansion around the Gaussian case, such as the matter density field in the weakly non-linear regime.
 
 - There is also a general utilities submodule called [`utils_th`](theory/utils_th.html).
 
@@ -14,5 +15,6 @@ from .base_th import TheoryField
 from .gaussian import SphericalGaussian, Gaussian #, EuclideanGaussian
 from .spingaussian import SpinGaussian
 from .chi2 import SphericalChi2, Chi2
+from .nongaussian import WeaklyNonGaussian
 
 __docformat__ = "numpy"

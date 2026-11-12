@@ -222,6 +222,95 @@ def LKC_Chi2(j, us, mu, dof=2, dim=None, lkc_ambient=None):
         result += flag(k+j, k) * rho_Chi2(k, dof, us) * lkc_ambient[k+j] * mu**(k/2.)
     return result
 
+def rho_WNG(k, us, sigma, skewness, kurtosis, order=2):
+    """Compute the density functions $\\rho_k(us)$ for weakly non-Gaussian fields, needed for the computation of the Lipschitz–Killing Curvatures.
+    They are given by the perturbative expansion of [Matsubara & Kuriki (2021)](https://arxiv.org/abs/2011.04954), Eq. (91), in powers of the standard deviation of the field, $\\sigma$.
+
+    Parameters
+    ----------
+    k : int
+        The order of the density function.
+
+    us : np.array
+        The thresholds where the density function is evaluated, in units of the standard deviation of the field.
+
+    sigma : float
+        The standard deviation of the field, which is the parameter of the expansion.
+
+    skewness : np.array
+        The skewness parameters of the field, $[S^{(0)}, S^{(1)}, S^{(2)}]$.
+
+    kurtosis : np.array
+        The kurtosis parameters of the field, $[K^{(0)}, K^{(1)}, K^{(2)}_1, K^{(2)}_2, K^{(3)}]$.
+
+    order : int, optional
+        The order of the expansion in $\\sigma$: `0` (Gaussian), `1` or `2`.
+        Default: 2.
+
+    Returns
+    -------
+    rho : np.array
+        The density function evaluated at the thresholds.
+
+    """
+    S0, S1, S2 = skewness
+    K0, K1, K21, K22, K3 = kurtosis
+    H = lambda n: eval_hermitenorm(n, us) if n >= 0 else 0.     # The terms with n<0 always have a null coefficient
+    correction = np.zeros_like(us)
+    if order >= 1:
+        correction += sigma * (S0/6. * H(k+2) + k/3. * S1 * H(k) + k*(k-1)/6. * S2 * H(k-2))
+    if order >= 2:
+        correction += sigma**2. * (S0**2./72. * H(k+5)
+                                   + (K0/24. + k/18. * S0*S1) * H(k+3)
+                                   + k * (K1/8. + (k-1)/36. * S0*S2 + (k-2)/18. * S1**2.) * H(k+1)
+                                   + k * ((k-2)/16. * K21 + k/16. * K22 + (k-1)*(k-4)/18. * S1*S2) * H(k-1)
+                                   + k*(k-1)*(k-2) * (K3/24. + (k-7)/72. * S2**2.) * H(k-3))
+    return rho(k, us) + norm.pdf(us) / (2.*np.pi)**(k/2.) * correction
+
+def LKC_WNG(j, us, mu, sigma, skewness, kurtosis, order=2, dim=None, lkc_ambient=None):
+    """Compute the expected value of the Lipschitz–Killing Curvatures (LKC) of the excursion set for weakly non-Gaussian Isotropic fields.
+
+    Parameters
+    ----------
+    j : int
+        The index of the LKC.
+
+    us : np.array
+        The thresholds where the LKC is evaluated, in units of the standard deviation of the field.
+
+    mu : float
+        The value of the derivative of the covariance function at the origin for the field.
+
+    sigma : float
+        The standard deviation of the field, which is the parameter of the expansion.
+
+    skewness : np.array
+        The skewness parameters of the field, $[S^{(0)}, S^{(1)}, S^{(2)}]$.
+
+    kurtosis : np.array
+        The kurtosis parameters of the field, $[K^{(0)}, K^{(1)}, K^{(2)}_1, K^{(2)}_2, K^{(3)}]$.
+
+    order : int, optional
+        The order of the expansion in $\\sigma$: `0` (Gaussian), `1` or `2`.
+        Default: 2.
+
+    dim : int, optional
+        The dimension of the ambient manifold.
+
+    lkc_ambient : np.array, optional
+        An array of the Lipschitz–Killing Curvatures of the ambient manifold. Its length must be `dim+1` if `dim` is also given.
+
+    Returns
+    -------
+    LKC : np.array
+        The expected value of the Lipschitz–Killing Curvatures at the thresholds.
+    """
+    dim, lkc_ambient = _prepare_lkc(dim, lkc_ambient)
+    result = np.zeros_like(us)
+    for k in np.arange(0,dim-j+1):
+        result += flag(k+j, k) * rho_WNG(k, us, sigma, skewness, kurtosis, order=order) * lkc_ambient[k+j] * mu**(k/2.)
+    return result
+
 
 def egoe(dim, a, b):
     """Compute the expected value of the Gaussian Orthogonal Ensamble, needed for the maxima distribution of Gaussian Isotropic fields.
@@ -277,7 +366,7 @@ lkc_ambient_dict = {"2D":np.array([0., 0., 1.]),
 """Dictionary with the characterization of different spaces through their Lipschitz–Killing Curvatures"""
 
 
-__all__ = ["get_μ", "flag", "omega", "rho", "rho_Chi2", "LKC", "LKC_Chi2", "lkc_ambient_dict"]
+__all__ = ["get_μ", "flag", "omega", "rho", "rho_Chi2", "rho_WNG", "LKC", "LKC_Chi2", "LKC_WNG", "lkc_ambient_dict"]
 
 __docformat__ = "numpy"
 

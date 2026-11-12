@@ -7,6 +7,9 @@ The pixels can be processed in chunks of `chunk_voxels` pixels, in parallel with
 The data fields only need to provide the field, the mask, the covariant derivatives (or the methods `get_first_der` and `get_second_der`
 to compute them), and optionally the weights of the pixels (`pixel_weights`). A data field can also define its own methods `_V0`, `_V1`,
 `_V2` and `_V3` (e.g., the fields in the $SO(3)$ formalism, see `pynkowski.data.so3data`), which are then used instead of the general computation.
+
+The function `cumulants` computes, in the same way, the parameters of a data field that define the weakly non-Gaussian expansion of its Minkowski Functionals
+(see `pynkowski.theory.nongaussian`).
 '''
 import numbers
 import os
@@ -455,6 +458,104 @@ def V3(field, us, edges=False, verbose=True, threads=None, chunk_voxels=1 << 17)
         raise TypeError(f"The field must be either TheoryField or DataField (or a subclass).")
 
 
-__all__ = ["V0", "V1", "V2", "V3", "general_curvature"]
+def cumulants(field, threads=None, chunk_voxels=1 << 17):
+    """Compute the parameters of the weakly non-Gaussian expansion of the Minkowski Functionals of a data field (see `pynkowski.theory.nongaussian.WeaklyNonGaussian`):
+    its standard deviation, $\\mu$, and the skewness and kurtosis parameters, as defined in [Matsubara & Kuriki (2021)](https://arxiv.org/abs/2011.04954), Eqs. (76)-(84).
+    They are computed from the averages of the field and its covariant derivatives within the mask (weighted by `pixel_weights` if given), with two passes over the field.
+
+    The moments of the field are computed around its mean within the mask. The theoretical fields have zero mean, so the mean of the field should be subtracted (or the thresholds shifted)
+    to compare them. The Gaussian contributions to the fourth-order moments are subtracted assuming that the field is homogeneous and isotropic (e.g., $\\langle f \\nabla^2 f \\rangle = - \\langle |\\nabla f|^2 \\rangle$).
+
+    Parameters
+    ----------
+    field : DataField
+        Field on which to compute the parameters. Its first and second derivatives are computed if they are not already available.
+
+    threads : int or None, optional
+        Number of threads used for the computation.
+        Default: None, i.e., one thread per CPU available to the process, limited by the environment variables `OMP_NUM_THREADS` and `SLURM_CPUS_PER_TASK` if they are set.
+
+    chunk_voxels : int, optional
+        Number of pixels processed at once by each thread. Lower values reduce the memory usage.
+        Default: 2**17.
+
+    Returns
+    -------
+    sigma : float
+        The standard deviation of the field within the mask.
+
+    mu : float
+        The variance of the first derivatives of the field normalised to unit variance, $\\sigma_1^2/(d\\sigma^2)$, where $\\sigma_1^2 = \\langle |\\nabla f|^2 \\rangle$.
+
+    skewness : np.array
+        The skewness parameters of the field, $[S^{(0)}, S^{(1)}, S^{(2)}]$. $S^{(2)}$ is set to 0 if `dim=1`, as it is not defined.
+
+    kurtosis : np.array
+        The kurtosis parameters of the field, $[K^{(0)}, K^{(1)}, K^{(2)}_1, K^{(2)}_2, K^{(3)}]$. If `dim=1`, only $K^{(2)}_1 - K^{(2)}_2$ is defined, and $K^{(2)}_2$ is set to 0.
+        $K^{(3)}$ is set to 0 if `dim<3`, as it is not defined.
+
+    """
+    assert isinstance(field, DataField), "The field must be a DataField (or subclass)"
+    if field.first_der is None:
+        field.get_first_der()
+    if field.second_der is None:
+        field.get_second_der()
+
+    f, m, w = _flat_data(field)
+    d = field.dim
+    fd = np.reshape(field.first_der, (d, -1))
+    sd = np.reshape(field.second_der, (-1, f.size))
+
+    def process_mean(sl):
+        sel = m[sl]
+        fl = np.asarray(f[sl][sel], dtype=np.float64)
+        if w is None:
+            return fl.sum(), fl.size
+        ww = np.asarray(w[sl][sel], dtype=np.float64)
+        return np.dot(ww, fl), ww.sum()
+
+    results = _map_chunks(process_mean, f.size, threads, chunk_voxels)
+    mean = sum(r[0] for r in results) / sum(r[1] for r in results)
+
+    def process(sl):
+        sel = m[sl]
+        x = np.asarray(f[sl][sel], dtype=np.float64) - mean
+        g2 = sum(np.asarray(g[sl][sel], dtype=np.float64)**2. for g in fd)                     # |∇f|²
+        h = [np.asarray(hh[sl][sel], dtype=np.float64) for hh in sd]
+        lap = sum(h[:d])                                                                        # ∇²f
+        h2 = sum(hh * hh for hh in h[:d]) + 2. * sum(hh * hh for hh in h[d:])                   # f_;ij f_;ij
+        x2, g2lap = x * x, g2 * lap
+        moments = [x2, g2, x2 * x, x * g2, g2lap, x2 * x2, x2 * g2, x * g2lap, g2 * g2, g2lap * lap, g2 * h2]
+        if w is None:
+            return np.array([x.size] + [mom.sum() for mom in moments])
+        ww = np.asarray(w[sl][sel], dtype=np.float64)
+        return np.array([ww.sum()] + [np.dot(ww, mom) for mom in moments])
+
+    sums = sum(_map_chunks(process, f.size, threads, chunk_voxels))
+    f2, g2, f3, fg2, g2lap, f4, f2g2, fg2lap, g4, g2lap2, g2h2 = sums[1:] / sums[0]
+    s0, s1 = np.sqrt(f2), np.sqrt(g2)
+    skewness = np.array([f3 / s0**4.,
+                         1.5 * fg2 / (s0**2. * s1**2.),
+                         -1.5 * d / (d-1.) * g2lap / s1**4. if d > 1 else 0.])
+    # Connected fourth-order moments: the Gaussian contributions are subtracted (Eqs. 79-84; note that Eq. 79 should read 3σ⁴)
+    f4_c = f4 - 3. * s0**4.
+    f2g2_c = f2g2 - s0**2. * s1**2.
+    fg2lap_c = fg2lap + s1**4.
+    g4_c = g4 - (d+2.) / d * s1**4.
+    if d > 1:
+        K21 = -2. * d / ((d+2.) * (d-1.)) * ((d+2.) * fg2lap_c + g4_c) / (s0**2. * s1**4.)
+        K22 = -2. * d / ((d+2.) * (d-1.)) * ((d+2.) * fg2lap_c + d * g4_c) / (s0**2. * s1**4.)
+    else:   # Only the difference is defined in 1D (Eq. 78)
+        K21, K22 = 2./3. * g4_c / (s0**2. * s1**4.), 0.
+    # The Gaussian contributions of both terms of K3 are the same (σ_1² σ_2²), so they cancel
+    kurtosis = np.array([f4_c / s0**6.,
+                         2. * f2g2_c / (s0**4. * s1**2.),
+                         K21,
+                         K22,
+                         2. * d**2. / ((d-1.) * (d-2.)) * (g2lap2 - g2h2) / s1**6. if d > 2 else 0.])
+    return s0, s1**2. / (d * s0**2.), skewness, kurtosis
+
+
+__all__ = ["V0", "V1", "V2", "V3", "general_curvature", "cumulants"]
 
 __docformat__ = "numpy"

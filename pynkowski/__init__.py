@@ -18,6 +18,7 @@ The theoretical expectation of some statistics is currently supported for the fo
 - Gaussian fields (such as CMB $T$ or the initial density field, see [paper 1](https://arxiv.org/abs/2211.07562)).
 - $\chi^2$ fields (such as CMB $P^2$, see [paper 1](https://arxiv.org/abs/2211.07562)).
 - Spin 2 maps in the $SO(3)$ formalism (see [paper 2](https://arxiv.org/abs/2301.13191)).
+- Weakly non-Gaussian fields, with a perturbative expansion around the Gaussian case up to second order (such as the matter density field in the weakly non-linear regime, see [Matsubara & Kuriki 2021](https://arxiv.org/abs/2011.04954)).
 
 We are actively working on the implementation of more statistics, data formats, and theoretical fields. If you want to contribute, we welcome and appreciate pull requests. 
 If you have any comments or suggestions, please feel free to contact us by email ([1](mailto:javier.carron@csic.es) and [2](mailto:alessandro.carones@roma2.infn.it )) or by opening a discussion thread or issue.
@@ -60,6 +61,7 @@ This package is divided into three modules: `stats`, `data`, and `theory`. Each 
     - [`gaussian`](https://javicarron.github.io/pynkowski/pynkowski/theory/gaussian.html)
     - [`spingaussian`](https://javicarron.github.io/pynkowski/pynkowski/theory/spingaussian.html)
     - [`chi2`](https://javicarron.github.io/pynkowski/pynkowski/theory/chi2.html)
+    - [`nongaussian`](https://javicarron.github.io/pynkowski/pynkowski/theory/nongaussian.html)
     - [`utils_th`](https://javicarron.github.io/pynkowski/pynkowski/theory/utils_th.html)
 
 The documentation for each submodule can be found by clicking on the links above or navigating the menu on the left.
@@ -88,7 +90,8 @@ from .theory import (TheoryField,
                     #  EuclideanGaussian,
                      SpinGaussian,
                      Chi2,
-                     SphericalChi2)
+                     SphericalChi2,
+                     WeaklyNonGaussian)
 
 from .stats import (V0, V1, V2, V3, maxima, minima)
 
